@@ -86,10 +86,10 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 };
 #endif
 
-void rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // Left side LED and CapsLock turns green when CapsLock is on
     // https://www.reddit.com/r/glorious/comments/rxj1h8/
-    if (IS_HOST_LED_ON(USB_LED_CAPS_LOCK)) {
+    if (host_keyboard_led_state().caps_lock) {
         RGB_MATRIX_INDICATOR_SET_COLOR(3, 0, 255, 0); //capslock key
 		RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 255, 0); //Side led 01
 		RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 255, 0); //Side led 02
@@ -111,4 +111,6 @@ void rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         // if NKRO is ON, light up the "N" key green (optional)
         // RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 255, 0);
     }
+
+    return true;
 }
