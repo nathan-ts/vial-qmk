@@ -85,3 +85,30 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
     [3] = { ENCODER_CCW_CW(KC_TRNS, KC_TRNS) },
 };
 #endif
+
+void rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    // Left side LED and CapsLock turns green when CapsLock is on
+    // https://www.reddit.com/r/glorious/comments/rxj1h8/
+    if (IS_HOST_LED_ON(USB_LED_CAPS_LOCK)) {
+        RGB_MATRIX_INDICATOR_SET_COLOR(3, 0, 255, 0); //capslock key
+		RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 255, 0); //Side led 01
+		RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 255, 0); //Side led 02
+		RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 255, 0); //Side led 03
+		RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 255, 0); //Side led 04
+		RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 255, 0); //Side led 05
+		RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 255, 0); //Side led 06
+		RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 255, 0); //Side led 07
+		RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 255, 0); //Side led 08
+    }
+
+    // NKRO indicator (N turns red when NKRO is disabled)
+    // keymap_config.nkro is the variable that tracks the internal status
+    // Note: 38 is the key index for the "N" key
+    if (!keymap_config.nkro) {
+        // if NKRO is OFF, light up the "N" key red
+        RGB_MATRIX_INDICATOR_SET_COLOR(38, 255, 0, 0); 
+    } else {
+        // if NKRO is ON, light up the "N" key green (optional)
+        // RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 255, 0);
+    }
+}
