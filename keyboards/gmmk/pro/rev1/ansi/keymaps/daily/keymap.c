@@ -133,14 +133,17 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 // ================
 // AUTO CLICK MACRO
 // ================
-#define AUTO_CLICK_INTERVAL 100 // in ms
+#define AUTO_CLICK_INTERVAL 100 // click speed, in ms
+#define TAP_HOLD_THRESHOLD 200 // threshold in ms to distinguish tap vs hold
 
 enum custom_keycodes {
     KC_AUTO_CLICK = SAFE_RANGE,
 };
 
-static bool auto_click_active = false;
-static uint16_t last_click_time = 0;
+static bool auto_click_active = false; // toggle to control auto click macro state
+static bool toggle_mode = false;       // tracks if we are in "sticky" toggle mode
+static uint16_t last_click_time = 0;   // ensures events only happen every AUTO_CLICK_INTERVAL
+static uint16_t press_timer = 0;       // tracks how long the key has been held
 
 // ==========================
 // GENERAL KEYBOARD FUNCTIONS
@@ -152,10 +155,21 @@ static uint16_t last_click_time = 0;
 /// @return boolean
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
-        case KC_AUTO_CLICK: // for auto click macro
-            auto_click_active = record->event.pressed;
-            if (!auto_click_active) {
-                unregister_code(KC_MS_BTN1);
+        // Auto click macro - different behaviour when tapped vs held
+        case KC_AUTO_CLICK: 
+            if (record->event.pressed) {
+                press_timer = timer_read(); // Start timer when pressed
+            } else { // Key released: Check if it was a short tap or a long hold
+                if (timer_elapsed(press_timer) < TAP_HOLD_THRESHOLD) {
+                    // TAP: Toggle the "sticky" mode
+                    toggle_mode = !toggle_mode;
+                    auto_click_active = toggle_mode;
+                } else {
+                    // HOLD: Stop clicking once released
+                    toggle_mode = false;
+                    auto_click_active = false;
+                    unregister_code(KC_MS_BTN1);
+                }
             }
             return false; // event caught by function
         default:
@@ -171,7 +185,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 /// @brief Custom matrix scanning routine additions (note: this runs very frequently)
 /// @param  
 void matrix_scan_user(void) {
-    if (auto_click_active) {  // for auto click macro
+
+    // KC_AUTO_CLICK logic
+    // Auto click if in toggle_mode OR the key is currently physically held
+    if (toggle_mode || is_key_down(KC_AUTO_CLICK)) {
         if (timer_elapsed(last_click_time) >= AUTO_CLICK_INTERVAL) {
             tap_code(KC_MS_BTN1);
             last_click_time = timer_read();
