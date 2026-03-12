@@ -11,4 +11,5 @@ VIAL_ENCODERS_ENABLE=yes # expose encoder (knob) to Vial GUI
 DEBOUNCE_TYPE=asym_eager_defer_pk # eager debounce on keydown, deferred on keyup
 # https://www.reddit.com/r/glorious/comments/qidnto
 
-DEBUG_ENABLE=yes
+# DEBUG_ENABLE=yes
+# CONSOLE_ENABLE=yes

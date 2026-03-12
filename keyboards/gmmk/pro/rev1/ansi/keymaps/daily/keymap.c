@@ -93,10 +93,12 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 #define TAP_HOLD_THRESHOLD 200          // threshold in ms to distinguish tap vs hold
 
 static bool auto_click_active = false;
-static bool toggle_mode = false;        // tracks if we are in "sticky" toggle mode
+static bool autoclick_toggle_mode = false;        // tracks if we are in "sticky" toggle mode
 static uint16_t last_click_time = 0;    // ensures events only happen every AUTO_CLICK_INTERVAL
 static bool auto_click_held = false;    // tracks if the auto click trigger key is currently being pressed
 static uint16_t press_timer = 0;        // tracks how long the key has been held
+static uint8_t auto_click_row = 0;      // capture physical position of key set to KC_AUTO_CLICK
+static uint8_t auto_click_col = 0;      // capture physical position of key set to KC_AUTO_CLICK
 
 // ===================
 // AUTO KEYPRESS MACRO
@@ -116,8 +118,7 @@ static uint16_t last_press_time = 0;
 // ==========================
 
 enum custom_keycodes {
-    KC_AUTO_CLICK = QK_KB_0,
-    KEYPRESS_MACRO
+    KC_AUTO_CLICK = QK_KB_0
 };
 // Vial custom keycodes: https://get.vial.today/docs/custom_keycode.html
 
@@ -126,14 +127,19 @@ enum custom_keycodes {
 /// @param record 
 /// @return boolean
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // KILL SWITCH: If active, any key press (except MO(2)) stops the keypress macro
+    // KILL SWITCH: if active, any key press stops the auto click macro
+    if (auto_click_active && record->event.pressed) {
+        auto_click_active = false;
+        autoclick_toggle_mode = false;
+        unregister_code(KC_MS_BTN1);
+    }
+    // KILL SWITCH: if active, any key press (except MO(2)) stops the keypress macro
     if (keypress_macro_active && record->event.pressed && keycode != MO(2)) {
-        dprint("Macro killed. Returning to layer 0.\n"); // Debug message
         keypress_macro_active = false;
-        unregister_code(last_pressed_key);
+        unregister_code(last_pressed_key); // ensure the target key is released
         uint8_t led_index = g_led_config.matrix_co[keypress_macro_row][keypress_macro_col];
         rgb_matrix_set_color(led_index, 0, 0, 0); // reset the LED colour
-        layer_move(0);
+        layer_move(0); // safety switch back to layer 0
         return true; 
     }
     switch (keycode) {
@@ -142,30 +148,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 press_timer = timer_read(); // Start timer when pressed
                 auto_click_held = true;
+                auto_click_row = record->event.key.row;
+                auto_click_col = record->event.key.col;
             } else { // Key released: Check if it was a short tap or a long hold
                 auto_click_held = false;
                 if (timer_elapsed(press_timer) < TAP_HOLD_THRESHOLD) {
                     // TAP: Toggle the "sticky" mode
-                    toggle_mode = !toggle_mode;
-                    auto_click_active = toggle_mode;
+                    autoclick_toggle_mode = !autoclick_toggle_mode;
+                    auto_click_active = autoclick_toggle_mode;
                 } else {
                     // HOLD: Stop clicking once released
-                    toggle_mode = false;
+                    autoclick_toggle_mode = false;
                     auto_click_active = false;
                     unregister_code(KC_MS_BTN1);
                 }
             }
             return false; // event caught by function
-        case KEYPRESS_MACRO: 
-            return true;
         default:
-            // SAFETY TOGGLE: if any other key is pressed, turn off auto click
-            if (record->event.pressed && auto_click_active) {
-                auto_click_active = false;
-                unregister_code(KC_MS_BTN1);
-            }
-            // Capture keys while on Layer 2
-            if (record->event.pressed && layer_state_is(2)) {
+            // Capture keys while on Layer 2 (excluding the Layer 2 toggle key itself)
+            if (record->event.pressed && layer_state_is(2) && keycode != MO(2)) {
                 last_pressed_key = keycode;
                 keypress_macro_active = true;
                 keypress_macro_row = record->event.key.row;
@@ -181,7 +182,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 void matrix_scan_user(void) {
     // KC_AUTO_CLICK logic
     // Auto click if in toggle_mode OR the key is currently physically held
-    if (toggle_mode || auto_click_held) {
+    if (autoclick_toggle_mode || auto_click_held) {
         if (timer_elapsed(last_click_time) >= AUTO_CLICK_INTERVAL) {
             tap_code(KC_MS_BTN1);
             last_click_time = timer_read();
@@ -191,7 +192,6 @@ void matrix_scan_user(void) {
     // KEYPRESS_MACRO logic
     if (keypress_macro_active) {
         if (timer_elapsed(last_press_time) >= AUTO_KEYPRESS_INTERVAL) {
-            dprint("Macro firing: "); dprintf("%d\n", last_pressed_key); // Print the key being pressed
             tap_code(last_pressed_key);
             last_press_time = timer_read();
         }
@@ -203,29 +203,29 @@ void matrix_scan_user(void) {
 /// @param led_max 
 /// @return true
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    // Left side LED and CapsLock turns green when CapsLock is on
+    // Left side LED and CapsLock turns green-blue when CapsLock is on
     // https://www.reddit.com/r/glorious/comments/rxj1h8/
     if (host_keyboard_led_state().caps_lock) {
-        RGB_MATRIX_INDICATOR_SET_COLOR(3, 0, 255, 0); //capslock key
-		RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 255, 0); //Side led 01
-		RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 255, 0); //Side led 02
-		RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 255, 0); //Side led 03
-		RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 255, 0); //Side led 04
-		RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 255, 0); //Side led 05
-		RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 255, 0); //Side led 06
-		RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 255, 0); //Side led 07
-		RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 255, 0); //Side led 08
+        RGB_MATRIX_INDICATOR_SET_COLOR( 3, 0, 255, 100); //capslock key
+		RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 255, 100); //Side led 01
+		RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 255, 100); //Side led 02
+		RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 255, 100); //Side led 03
+		RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 255, 100); //Side led 04
+		RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 255, 100); //Side led 05
+		RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 255, 100); //Side led 06
+		RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 255, 100); //Side led 07
+		RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 255, 100); //Side led 08
     } else {
         // Reset these LEDs so they return to the default keyboard effect; use an empty color to clear manual override
-        RGB_MATRIX_INDICATOR_SET_COLOR(3, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 0, 0);
-        RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR( 3, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 0, 0);
     }
 
     // NKRO indicator (N turns red when NKRO is disabled)
@@ -236,15 +236,25 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         RGB_MATRIX_INDICATOR_SET_COLOR(38, 255, 0, 0); 
     } else {
         // Reset the LED for "N" key
-        RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 0, 0);
+        // RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 0, 0);
     }
 
     // KEYPRESS_MACRO logic: only blink the macro'd key
     if (keypress_macro_active) {
         uint8_t led_index = g_led_config.matrix_co[keypress_macro_row][keypress_macro_col];
         if ((timer_read() / AUTO_KEYPRESS_INTERVAL) % 2 == 0) {
-            RGB_MATRIX_INDICATOR_SET_COLOR(led_index, 255, 0, 0); // Blink Red
+            RGB_MATRIX_INDICATOR_SET_COLOR(led_index, 175, 200, 255); // blink pale blue
         }
+    }
+
+    if (autoclick_toggle_mode || auto_click_held) {
+        uint8_t led_index = g_led_config.matrix_co[auto_click_row][auto_click_col];
+        if ((timer_read() / AUTO_CLICK_INTERVAL) % 2 == 0) {
+            RGB_MATRIX_INDICATOR_SET_COLOR(led_index, 69, 120, 255); // blink ultramarine
+        }
+        // Note: We do NOT set the color to 0,0,0 here. 
+        // By leaving it alone when not blinking, we allow the 
+        // default RGB lighting effect to show through automatically.
     }
 
     return true;

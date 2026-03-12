@@ -222,11 +222,6 @@
       "name": "Auto Click",
       "title": "Toggles auto-click mode",
       "shortName": "AUTO_CLK"
-    },
-    {
-      "name": "Keypress Macro",
-      "title": "Starts/Stops macro",
-      "shortName": "KPMACRO"
     }
   ]
 }
