@@ -216,5 +216,8 @@
         "0,5"
       ]
     ]
-  }
+  },
+  "vial_keycodes": [
+    "KC_AUTO_CLICK"
+  ]
 }

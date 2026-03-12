@@ -99,6 +99,17 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 		RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 255, 0); //Side led 06
 		RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 255, 0); //Side led 07
 		RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 255, 0); //Side led 08
+    } else {
+        // Reset these LEDs so they return to the default keyboard effect; use an empty color to clear manual override
+        RGB_MATRIX_INDICATOR_SET_COLOR(3, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 0, 0);
     }
 
     // NKRO indicator (N turns red when NKRO is disabled)
@@ -108,9 +119,37 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         // if NKRO is OFF, light up the "N" key red
         RGB_MATRIX_INDICATOR_SET_COLOR(38, 255, 0, 0); 
     } else {
-        // if NKRO is ON, light up the "N" key green (optional)
-        // RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 255, 0);
+        // Reset the LED for "N" key
+        RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 0, 0);
     }
 
     return true;
+}
+
+enum custom_keycodes {
+    KC_AUTO_CLICK = SAFE_RANGE,
+};
+
+// Variable to track if the key is being held
+static bool auto_click_active = false;
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    switch (keycode) {
+        case KC_AUTO_CLICK:
+            auto_click_active = record->event.pressed; // True while held, false on release
+            return false; // Stop processing this key
+        default:
+            return true;
+    }
+}
+
+// 3. Handle the timing (10 clicks per second = 100ms interval)
+void matrix_scan_user(void) {
+    if (auto_click_active) {
+        static uint16_t last_click_time = 0;
+        if (timer_elapsed(last_click_time) > 100) { // 100ms = 10 clicks/sec
+            tap_code(KC_MS_BTN1);
+            last_click_time = timer_read();
+        }
+    }
 }
