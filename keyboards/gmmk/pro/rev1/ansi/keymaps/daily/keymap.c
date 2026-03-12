@@ -86,6 +86,10 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 };
 #endif
 
+/// @brief Advanced RGB control logic
+/// @param led_min 
+/// @param led_max 
+/// @return true
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     // Left side LED and CapsLock turns green when CapsLock is on
     // https://www.reddit.com/r/glorious/comments/rxj1h8/
@@ -126,28 +130,49 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     return true;
 }
 
+// ================
+// AUTO CLICK MACRO
+// ================
+#define AUTO_CLICK_INTERVAL 100 // in ms
+
 enum custom_keycodes {
     KC_AUTO_CLICK = SAFE_RANGE,
 };
 
-// Variable to track if the key is being held
 static bool auto_click_active = false;
+static uint16_t last_click_time = 0;
 
+// ==========================
+// GENERAL KEYBOARD FUNCTIONS
+// ==========================
+
+/// @brief Callback function triggered on any key press/release event
+/// @param keycode 
+/// @param record 
+/// @return boolean
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
-        case KC_AUTO_CLICK:
-            auto_click_active = record->event.pressed; // True while held, false on release
-            return false; // Stop processing this key
+        case KC_AUTO_CLICK: // for auto click macro
+            auto_click_active = record->event.pressed;
+            if (!auto_click_active) {
+                unregister_code(KC_MS_BTN1);
+            }
+            return false; // event caught by function
         default:
-            return true;
+            // SAFETY TOGGLE: if any other key is pressed, turn off auto click
+            if (record->event.pressed && auto_click_active) {
+                auto_click_active = false;
+                unregister_code(KC_MS_BTN1);
+            }
+            return true; // event passthrough to system
     }
 }
 
-// 3. Handle the timing (10 clicks per second = 100ms interval)
+/// @brief Custom matrix scanning routine additions (note: this runs very frequently)
+/// @param  
 void matrix_scan_user(void) {
-    if (auto_click_active) {
-        static uint16_t last_click_time = 0;
-        if (timer_elapsed(last_click_time) > 100) { // 100ms = 10 clicks/sec
+    if (auto_click_active) {  // for auto click macro
+        if (timer_elapsed(last_click_time) >= AUTO_CLICK_INTERVAL) {
             tap_code(KC_MS_BTN1);
             last_click_time = timer_read();
         }
