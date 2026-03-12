@@ -39,6 +39,7 @@
 // Additional custom configs
 #define VIAL_ENCODER_DEFAULT { KC_VOLD, KC_VOLU, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS }
 // - hardcoded fallback encoder/knob map
+#define VIAL_ENCODER_KEYCODE_DELAY 10
 #define FORCE_NKRO // keeb will not fallback to 6KRO, starts in NKRO
 #define DEBOUNCE 8 // debounce time in ms for asymmetrical eager/deferred debounce (see rules.mk DEBOUNCE_TYPE)
 // if inputs skipped, decrease debounce; if one press doubleinputs, increase
