@@ -28,3 +28,5 @@
 #define VIAL_KEYBOARD_UID {0x03, 0x75, 0x3D, 0xEC, 0x97, 0xC2, 0xE9, 0x9A}
 #define VIAL_UNLOCK_COMBO_ROWS { 1, 10 }
 #define VIAL_UNLOCK_COMBO_COLS { 3, 4 }
+
+#define FORCE_NKRO // keeb will not fallback to 6KRO, starts in NKRO
