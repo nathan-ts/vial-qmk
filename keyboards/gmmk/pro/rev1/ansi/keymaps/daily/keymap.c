@@ -89,22 +89,22 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 // ================
 // AUTO CLICK MACRO
 // ================
-#define AUTO_CLICK_INTERVAL 100         // click speed, in ms
-#define TAP_HOLD_THRESHOLD 200          // threshold in ms to distinguish tap vs hold
+#define AUTO_CLICK_INTERVAL 100             // click speed, in ms
+#define TAP_HOLD_THRESHOLD 200              // threshold in ms to distinguish tap vs hold
 
 static bool auto_click_active = false;
-static bool autoclick_toggle_mode = false;        // tracks if we are in "sticky" toggle mode
-static uint16_t last_click_time = 0;    // ensures events only happen every AUTO_CLICK_INTERVAL
-static bool auto_click_held = false;    // tracks if the auto click trigger key is currently being pressed
-static uint16_t press_timer = 0;        // tracks how long the key has been held
-static uint8_t auto_click_row = 0;      // capture physical position of key set to KC_AUTO_CLICK
-static uint8_t auto_click_col = 0;      // capture physical position of key set to KC_AUTO_CLICK
+static bool autoclick_toggle_mode = false;  // tracks if we are in "sticky" toggle mode
+static uint16_t last_click_time = 0;        // ensures events only happen every AUTO_CLICK_INTERVAL
+static bool auto_click_held = false;        // tracks if the auto click trigger key is currently being pressed
+static uint16_t press_timer = 0;            // tracks how long the key has been held
+static uint8_t auto_click_row = 0;          // capture physical position of key set to KC_AUTO_CLICK
+static uint8_t auto_click_col = 0;          // capture physical position of key set to KC_AUTO_CLICK
 
 // ===================
 // AUTO KEYPRESS MACRO
 // ===================
 
-// Note: Layer 2 is reserved for this keypress macro functionality. 
+// Note: Layer 2 is reserved for this keypress macro functionality. It should be set to the actual characters, not KC_TRNS, in Vial. 
 #define AUTO_KEYPRESS_INTERVAL 100          // keypress speed, in ms
 
 static bool keypress_macro_active = false;
@@ -139,7 +139,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         unregister_code(last_pressed_key); // ensure the target key is released
         uint8_t led_index = g_led_config.matrix_co[keypress_macro_row][keypress_macro_col];
         rgb_matrix_set_color(led_index, 0, 0, 0); // reset the LED colour
-        layer_move(0); // safety switch back to layer 0
+        layer_move(0); // extraneous; safety switch back to layer 0
         return true; 
     }
     switch (keycode) {
@@ -215,28 +215,13 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 		RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 255, 100); //Side led 06
 		RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 255, 100); //Side led 07
 		RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 255, 100); //Side led 08
-    } else {
-        // Reset these LEDs so they return to the default keyboard effect; use an empty color to clear manual override
-        // RGB_MATRIX_INDICATOR_SET_COLOR( 3, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(67, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(70, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(73, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(76, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(80, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(83, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(87, 0, 0, 0);
-        // RGB_MATRIX_INDICATOR_SET_COLOR(91, 0, 0, 0);
     }
 
     // NKRO indicator (N turns red when NKRO is disabled)
     // keymap_config.nkro is the variable that tracks the internal status
-    // Note: 38 is the key index for the "N" key
     if (!keymap_config.nkro) {
         // if NKRO is OFF, light up the "N" key red
-        RGB_MATRIX_INDICATOR_SET_COLOR(38, 255, 0, 0); 
-    } else {
-        // Reset the LED for "N" key
-        // RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 0, 0);
+        RGB_MATRIX_INDICATOR_SET_COLOR(38, 255, 0, 0); // 38 is the key index for the "N" key
     }
 
     // KEYPRESS_MACRO logic: only blink the macro'd key
@@ -252,9 +237,6 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         if ((timer_read() / AUTO_CLICK_INTERVAL) % 2 == 0) {
             RGB_MATRIX_INDICATOR_SET_COLOR(led_index, 69, 120, 255); // blink ultramarine
         }
-        // Note: We do NOT set the color to 0,0,0 here. 
-        // By leaving it alone when not blinking, we allow the 
-        // default RGB lighting effect to show through automatically.
     }
 
     return true;
