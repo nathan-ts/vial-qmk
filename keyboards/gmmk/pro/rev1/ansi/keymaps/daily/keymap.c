@@ -86,6 +86,118 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 };
 #endif
 
+// ================
+// AUTO CLICK MACRO
+// ================
+#define AUTO_CLICK_INTERVAL 100         // click speed, in ms
+#define TAP_HOLD_THRESHOLD 200          // threshold in ms to distinguish tap vs hold
+
+static bool auto_click_active = false;
+static bool toggle_mode = false;        // tracks if we are in "sticky" toggle mode
+static uint16_t last_click_time = 0;    // ensures events only happen every AUTO_CLICK_INTERVAL
+static bool auto_click_held = false;    // tracks if the auto click trigger key is currently being pressed
+static uint16_t press_timer = 0;        // tracks how long the key has been held
+
+// ===================
+// AUTO KEYPRESS MACRO
+// ===================
+
+// Note: Layer 2 is reserved for this keypress macro functionality. 
+#define AUTO_KEYPRESS_INTERVAL 100          // keypress speed, in ms
+
+static bool keypress_macro_active = false;
+static uint16_t last_pressed_key = KC_NO;   // Stores the selected key
+static uint8_t keypress_macro_row = 0;      // Stores the position of the key
+static uint8_t keypress_macro_col = 0;      // Stores the position of the key
+static uint16_t last_press_time = 0;
+
+// ==========================
+// GENERAL KEYBOARD FUNCTIONS
+// ==========================
+
+enum custom_keycodes {
+    KC_AUTO_CLICK = QK_KB_0,
+    KEYPRESS_MACRO
+};
+// Vial custom keycodes: https://get.vial.today/docs/custom_keycode.html
+
+/// @brief Callback function triggered on any key press/release event
+/// @param keycode 
+/// @param record 
+/// @return boolean
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // KILL SWITCH: If active, any key press (except MO(2)) stops the keypress macro
+    if (keypress_macro_active && record->event.pressed && keycode != MO(2)) {
+        dprint("Macro killed. Returning to layer 0.\n"); // Debug message
+        keypress_macro_active = false;
+        unregister_code(last_pressed_key);
+        uint8_t led_index = g_led_config.matrix_co[keypress_macro_row][keypress_macro_col];
+        rgb_matrix_set_color(led_index, 0, 0, 0); // reset the LED colour
+        layer_move(0);
+        return true; 
+    }
+    switch (keycode) {
+        // Auto click macro - different behaviour when tapped vs held
+        case KC_AUTO_CLICK: 
+            if (record->event.pressed) {
+                press_timer = timer_read(); // Start timer when pressed
+                auto_click_held = true;
+            } else { // Key released: Check if it was a short tap or a long hold
+                auto_click_held = false;
+                if (timer_elapsed(press_timer) < TAP_HOLD_THRESHOLD) {
+                    // TAP: Toggle the "sticky" mode
+                    toggle_mode = !toggle_mode;
+                    auto_click_active = toggle_mode;
+                } else {
+                    // HOLD: Stop clicking once released
+                    toggle_mode = false;
+                    auto_click_active = false;
+                    unregister_code(KC_MS_BTN1);
+                }
+            }
+            return false; // event caught by function
+        case KEYPRESS_MACRO: 
+            return true;
+        default:
+            // SAFETY TOGGLE: if any other key is pressed, turn off auto click
+            if (record->event.pressed && auto_click_active) {
+                auto_click_active = false;
+                unregister_code(KC_MS_BTN1);
+            }
+            // Capture keys while on Layer 2
+            if (record->event.pressed && layer_state_is(2)) {
+                last_pressed_key = keycode;
+                keypress_macro_active = true;
+                keypress_macro_row = record->event.key.row;
+                keypress_macro_col = record->event.key.col;
+                return false; 
+            }
+            return true; // event passthrough to system
+    }
+}
+
+/// @brief Custom matrix scanning routine additions (note: this runs very frequently)
+/// @param  
+void matrix_scan_user(void) {
+    // KC_AUTO_CLICK logic
+    // Auto click if in toggle_mode OR the key is currently physically held
+    if (toggle_mode || auto_click_held) {
+        if (timer_elapsed(last_click_time) >= AUTO_CLICK_INTERVAL) {
+            tap_code(KC_MS_BTN1);
+            last_click_time = timer_read();
+        }
+    }
+
+    // KEYPRESS_MACRO logic
+    if (keypress_macro_active) {
+        if (timer_elapsed(last_press_time) >= AUTO_KEYPRESS_INTERVAL) {
+            dprint("Macro firing: "); dprintf("%d\n", last_pressed_key); // Print the key being pressed
+            tap_code(last_pressed_key);
+            last_press_time = timer_read();
+        }
+    }
+}
+
 /// @brief Advanced RGB control logic
 /// @param led_min 
 /// @param led_max 
@@ -127,71 +239,13 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         RGB_MATRIX_INDICATOR_SET_COLOR(38, 0, 0, 0);
     }
 
-    return true;
-}
-
-// ================
-// AUTO CLICK MACRO
-// ================
-#define AUTO_CLICK_INTERVAL 100 // click speed, in ms
-#define TAP_HOLD_THRESHOLD 200 // threshold in ms to distinguish tap vs hold
-
-enum custom_keycodes {
-    KC_AUTO_CLICK = SAFE_RANGE,
-};
-
-static bool auto_click_active = false; // toggle to control auto click macro state
-static bool toggle_mode = false;       // tracks if we are in "sticky" toggle mode
-static uint16_t last_click_time = 0;   // ensures events only happen every AUTO_CLICK_INTERVAL
-static uint16_t press_timer = 0;       // tracks how long the key has been held
-
-// ==========================
-// GENERAL KEYBOARD FUNCTIONS
-// ==========================
-
-/// @brief Callback function triggered on any key press/release event
-/// @param keycode 
-/// @param record 
-/// @return boolean
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    switch (keycode) {
-        // Auto click macro - different behaviour when tapped vs held
-        case KC_AUTO_CLICK: 
-            if (record->event.pressed) {
-                press_timer = timer_read(); // Start timer when pressed
-            } else { // Key released: Check if it was a short tap or a long hold
-                if (timer_elapsed(press_timer) < TAP_HOLD_THRESHOLD) {
-                    // TAP: Toggle the "sticky" mode
-                    toggle_mode = !toggle_mode;
-                    auto_click_active = toggle_mode;
-                } else {
-                    // HOLD: Stop clicking once released
-                    toggle_mode = false;
-                    auto_click_active = false;
-                    unregister_code(KC_MS_BTN1);
-                }
-            }
-            return false; // event caught by function
-        default:
-            // SAFETY TOGGLE: if any other key is pressed, turn off auto click
-            if (record->event.pressed && auto_click_active) {
-                auto_click_active = false;
-                unregister_code(KC_MS_BTN1);
-            }
-            return true; // event passthrough to system
-    }
-}
-
-/// @brief Custom matrix scanning routine additions (note: this runs very frequently)
-/// @param  
-void matrix_scan_user(void) {
-
-    // KC_AUTO_CLICK logic
-    // Auto click if in toggle_mode OR the key is currently physically held
-    if (toggle_mode || is_key_down(KC_AUTO_CLICK)) {
-        if (timer_elapsed(last_click_time) >= AUTO_CLICK_INTERVAL) {
-            tap_code(KC_MS_BTN1);
-            last_click_time = timer_read();
+    // KEYPRESS_MACRO logic: only blink the macro'd key
+    if (keypress_macro_active) {
+        uint8_t led_index = g_led_config.matrix_co[keypress_macro_row][keypress_macro_col];
+        if ((timer_read() / AUTO_KEYPRESS_INTERVAL) % 2 == 0) {
+            RGB_MATRIX_INDICATOR_SET_COLOR(led_index, 255, 0, 0); // Blink Red
         }
     }
+
+    return true;
 }
